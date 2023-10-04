@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"os"
@@ -22,21 +23,30 @@ type application struct {
 }
 
 func main() {
+	// Declare an instance of the config struct.
 	var cfg config
+	// Read the value of the port and env command-line flags into the config struct. We
+	// default to using the port number 4000 and the environment "development" if no
+	// corresponding flags are provided.
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 	flag.Parse()
-
+	// Initialize a new logger which writes messages to the standard out stream,
+	// prefixed with the current date and time.
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	// Declare an instance of the application struct, containing the config struct and
+	// the logger.
 	app := &application{
 		config: cfg,
 		logger: logger,
 	}
-
+	// Declare a new servemux and add a /v1/healthcheck route which dispatches requests
+	// to the healthcheckHandler method (which we will create in a moment).
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/healthcheck", app.healthcheckHandler)
-	mux.HandleFunc("/v1/cameras", app.cameraInfoHandler)
-
+	// Declare a HTTP server with some sensible timeout settings, which listens on the
+	// port provided in the config struct and uses the servemux we created above as the
+	// handler.
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.port),
 		Handler:      mux,
@@ -44,23 +54,14 @@ func main() {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-
+	// Start the HTTP server.
 	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
 	err := srv.ListenAndServe()
-	if err != nil {
-		logger.Fatal(err)
-	}
+	logger.Fatal(err)
 }
 
-func (app *application) healthcheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "ok", "version": "` + version + `"}`))
-}
-
-func (app *application) cameraInfoHandler(w http.ResponseWriter, r *http.Request) {
-	cameraInfo := []byte(`{"camera": "Vintage Camera Info"}`)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(cameraInfo)
+func (app *application) routes() http.Handler {
+	router := mux.NewRouter()
+	router.HandleFunc("/v1/healthcheck", app.healthcheckHandler).Methods("GET")
+	return router
 }
