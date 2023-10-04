@@ -65,3 +65,15 @@ func (app *application) routes() http.Handler {
 	router.HandleFunc("/v1/healthcheck", app.healthcheckHandler).Methods("GET")
 	return router
 }
+
+func (app *application) healthcheckHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "status: available")
+	fmt.Fprintf(w, "environment: %s\n", app.config.env)
+	fmt.Fprintf(w, "version: %s\n", version)
+}
+
+func (app *application) healthcheckHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "status: available")
+	fmt.Fprintf(w, "environment: %s\n", app.config.env)
+	fmt.Fprintf(w, "version: %s\n", version)
+}
