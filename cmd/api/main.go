@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,9 +15,8 @@ type config struct {
 	env  string
 }
 type application struct {
-	config            config
-	logger            *log.Logger
-	showCameraHandler interface{}
+	config config
+	logger *log.Logger
 }
 
 func main() {
@@ -26,28 +24,23 @@ func main() {
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 	flag.Parse()
+
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
 	app := &application{
 		config: cfg,
 		logger: logger,
 	}
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
+		Addr:         "localhost:4000",
 		Handler:      app.routes(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
+
 	logger.Printf("starting %s server on %s", cfg.env, srv.Addr)
 	err := srv.ListenAndServe()
 	logger.Fatal(err)
-}
-func (app *application) showCameraHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := app.readIDParam(r)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	fmt.Fprintf(w, "show the details of camera %d\n", id)
 }
