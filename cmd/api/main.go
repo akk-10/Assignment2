@@ -41,7 +41,7 @@ func main() {
 	flag.Parse()
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 
-	db, err := openDB(cfg)
+	db, err := sql.Open("postgres", cfg.db.dsn)
 	if err != nil {
 		logger.Fatal(err)
 	}
