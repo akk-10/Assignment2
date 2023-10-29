@@ -1,3 +1,4 @@
+alter database mycameraapp owner to mycameraapp;
 ALTER TABLE cameras
     ADD CONSTRAINT model_check CHECK (model IS NOT NULL);
 
