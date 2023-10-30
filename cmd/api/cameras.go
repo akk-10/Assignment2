@@ -140,7 +140,12 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 
 	err = app.models.Camera.Update(camera)
 	if err != nil {
-		app.serverErrorResponse(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			app.editConflictResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
 		return
 	}
 	err = app.writeJSON(w, http.StatusOK, envelope{"camera": camera}, nil)
@@ -169,7 +174,45 @@ func (app *application) deleteCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
+func (app *application) listCameraHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Name  string
+		Model string
+		data.Filters
+	}
+
+	v := validator.New()
+
+	qs := r.URL.Query()
+
+	input.Name = app.readString(qs, "name", "")
+	input.Model = app.readString(qs, "model", "")
+
+	input.Filters.Page = app.readInt(qs, "page", 1, v)
+	input.Filters.PageSize = app.readInt(qs, "page_size", 20, v)
+
+	input.Filters.Sort = app.readString(qs, "sort", "id")
+	input.Filters.SortSafelist = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+
+	if data.ValidateFilters(v, input.Filters); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	cameras, err := app.models.Camera.GetAll(input.Name, input.Model, input.Filters)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": cameras}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+}
 
 // BODY='{"Name":"Film Camera","Model":"Nikon FM2","Resolution":"35mm", "Weight":650.0"}'
-//curl -X PUT -d "$BODY" localhost:4000/v1/cameras/2
+// curl -X PUT -d "$BODY" localhost:4000/v1/cameras
 // curl -X PATCH -d '{"weight: 750.0}' localhost:4000/v1/cameras/1
+// xargs -I % -P8 curl -X PATCH -d '{"weight": 970.0}' "localhost:4000/v1/cameras/1" < <(printf '%s\n' {1..8})
+// curl "localhost:4000/v1/cameras?name=VintageCamera&genres=CanonEOS5DMarkIV&page=1&page_size=5&sort=zoom"
+// curl "localhost:4000/v1/cameras?page=abc&page_size=abc"
+// --curl "localhost:4000/v1/cameras?page=-1&page_size=-1&sort=foo"

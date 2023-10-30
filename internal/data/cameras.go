@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"mycameraapp/internal/validator"
@@ -12,15 +13,17 @@ type CameraModel struct {
 }
 
 func (c CameraModel) Insert(camera *Camera) error {
-	query := `INSERT INTO camera (Name, Model, Resolution, Weight, Zoom) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, version`
+	query := `INSERT INTO cameras (Name, Model, Resolution, Weight, Zoom) VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, version`
 
 	args := []interface{}{camera.Name, camera.Model, camera.Resolution, camera.Weight, camera.Zoom}
-
-	return c.DB.QueryRow(query, args...).Scan(&camera.ID, &camera.CreatedAt, &camera.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	return c.DB.QueryRowContext(ctx, query, args...).Scan(&camera.ID, &camera.CreatedAt, &camera.Version)
 }
 
 var (
 	ErrRecordNotFound = errors.New("record not found")
+	ErrEditConflict   = errors.New("edit conflict")
 )
 
 type Models struct {
@@ -58,11 +61,14 @@ func (c CameraModel) Get(id int64) (*Camera, error) {
 	if id < 1 {
 		return nil, ErrRecordNotFound
 	}
-	// Define the SQL query for retrieving the movie data.
-	query := `SELECT id, created_at, name, model, resolution, weight, zoom FROM cameras WHERE Id = $1`
+
+	query := `SELECT  id, created_at, name, model, resolution, weight, zoom FROM cameras WHERE Id = $1`
 	var camera Camera
 
-	err := c.DB.QueryRow(query, id).Scan(
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := c.DB.QueryRowContext(ctx, query, id).Scan(
 		&camera.ID,
 		&camera.CreatedAt,
 		&camera.Name,
@@ -84,7 +90,7 @@ func (c CameraModel) Get(id int64) (*Camera, error) {
 	return &camera, nil
 }
 func (c CameraModel) Update(camera *Camera) error {
-	query := `UPDATE cameras SET name = $1, model = $2, resolution = $3, weight = $4, weight = $5, version = version + 1 WHERE id = $6 RETURNING version`
+	query := `UPDATE cameras SET name = $1, model = $2, resolution = $3, weight = $4, weight = $5, version = version + 1 WHERE id = $6 AND version = $7 RETURNING version`
 
 	args := []interface{}{
 		camera.Name,
@@ -94,15 +100,31 @@ func (c CameraModel) Update(camera *Camera) error {
 		camera.Zoom,
 		camera.ID,
 	}
-	return c.DB.QueryRow(query, args...).Scan(&camera.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := c.DB.QueryRowContext(ctx, query, args...).Scan(&camera.Version)
+	if err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+	return nil
 }
 func (c CameraModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}
-	query := `DELETE FROM cameras WHERE id = $1`
+	query := `DELETE FROM cameras 
+       WHERE id = $1`
 
-	result, err := c.DB.Exec(query, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := c.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
@@ -115,3 +137,43 @@ func (c CameraModel) Delete(id int64) error {
 	}
 	return nil
 }
+func (c CameraModel) GetAll(name string, model string, filters Filters) ([]*Camera, error) {
+	query := ` SELECT id, created_at, name, model, resolution, weight, zoom FROM cameras 
+        WHERE (to_tsvector('simple', name) @@ plainto_tsquery('simple', $1) OR $1 = '')
+        AND (model @> $2 OR $2 = '')
+        ORDER BY id`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := c.DB.QueryContext(ctx, query, name, model)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	cameras := []*Camera{}
+
+	for rows.Next() {
+		var camera Camera
+		err := rows.Scan(
+			&camera.ID,
+			&camera.CreatedAt,
+			&camera.Name,
+			&camera.Model,
+			&camera.Resolution,
+			&camera.Zoom,
+			&camera.Version,
+		)
+		if err != nil {
+			return nil, err
+		}
+		cameras = append(cameras, &Camera)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return cameras, nil
+}
+
+// curl -w '\nTime: %{time_total}s \n' localhost:4000/v1/cameras/1
