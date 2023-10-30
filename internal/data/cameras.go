@@ -4,12 +4,22 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"math"
 	"mycameraapp/internal/validator"
 	"time"
 )
 
 type CameraModel struct {
 	DB *sql.DB
+}
+
+type Metadata struct {
+	CurrentPage  int `json:"current_page,omitempty"`
+	PageSize     int `json:"page_size,omitempty"`
+	FirstPage    int `json:"first_page,omitempty"`
+	LastPage     int `json:"last_page,omitempty"`
+	TotalRecords int `json:"total_records,omitempty"`
 }
 
 func (c CameraModel) Insert(camera *Camera) error {
@@ -137,26 +147,36 @@ func (c CameraModel) Delete(id int64) error {
 	}
 	return nil
 }
-func (c CameraModel) GetAll(name string, model string, filters Filters) ([]*Camera, error) {
-	query := ` SELECT id, created_at, name, model, resolution, weight, zoom FROM cameras 
+func (c CameraModel) GetAll(name string, model string, filters Filters) ([]*Camera, Metadata, error) {
+	query := fmt.Sprintf(` SELECT id, created_at, name, model, resolution, weight, zoom FROM cameras 
         WHERE (to_tsvector('simple', name) @@ plainto_tsquery('simple', $1) OR $1 = '')
-        AND (model @> $2 OR $2 = '')
-        ORDER BY id`
+        AND (model @> $2 OR $2 = '') ORDER BY %s %s, id ASC
+        LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	args := []interface{}{name, model, filters.limit(), filters.offset()}
+
+	rows, err := c.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, Metadata{}, err
+	}
+
 	rows, err := c.DB.QueryContext(ctx, query, name, model)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
 	defer rows.Close()
+
+	totalRecords := 0
 	cameras := []*Camera{}
 
 	for rows.Next() {
 		var camera Camera
 		err := rows.Scan(
+			&totalRecords,
 			&camera.ID,
 			&camera.CreatedAt,
 			&camera.Name,
@@ -166,14 +186,29 @@ func (c CameraModel) GetAll(name string, model string, filters Filters) ([]*Came
 			&camera.Version,
 		)
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
-		cameras = append(cameras, &Camera)
+		cameras = append(cameras, &camera)
 	}
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
-	return cameras, nil
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return cameras, metadata, nil
+}
+
+func calculateMetadata(totalRecords, page, pageSize int) Metadata {
+	if totalRecords == 0 {
+		return Metadata{}
+	}
+	return Metadata{
+		CurrentPage:  page,
+		PageSize:     pageSize,
+		FirstPage:    1,
+		LastPage:     int(math.Ceil(float64(totalRecords) / float64(pageSize))),
+		TotalRecords: totalRecords,
+	}
 }
 
 // curl -w '\nTime: %{time_total}s \n' localhost:4000/v1/cameras/1

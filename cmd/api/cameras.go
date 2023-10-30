@@ -199,14 +199,15 @@ func (app *application) listCameraHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	cameras, err := app.models.Camera.GetAll(input.Name, input.Model, input.Filters)
+	cameras, metadata, err := app.models.Camera.GetAll(input.Name, input.Model, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
-	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": cameras}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": cameras, "metadata": metadata}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
+	}
 }
 
 // BODY='{"Name":"Film Camera","Model":"Nikon FM2","Resolution":"35mm", "Weight":650.0"}'
