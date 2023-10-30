@@ -98,11 +98,11 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var input struct {
-		Name       string  `json:"name"`
-		Model      string  `json:"model"`
-		Resolution string  `json:"resolution"`
-		Weight     float64 `json:"weight"`
-		Zoom       float64 `json:"zoom"`
+		Name       *string  `json:"name"`
+		Model      *string  `json:"model"`
+		Resolution *string  `json:"resolution"`
+		Weight     *float64 `json:"weight"`
+		Zoom       *float64 `json:"zoom"`
 	}
 
 	err = app.readJSON(w, r, &input)
@@ -110,11 +110,27 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	camera.Name = input.Name
-	camera.Model = input.Model
-	camera.Resolution = input.Resolution
-	camera.Weight = input.Weight
-	camera.Zoom = input.Zoom
+	//camera.Name = input.Name
+	//camera.Model = input.Model
+	//camera.Resolution = input.Resolution
+	//camera.Weight = input.Weight
+	//camera.Zoom = input.Zoom
+
+	if input.Name != nil {
+		camera.Name = *input.Name
+	}
+	if input.Model != nil {
+		camera.Model = *input.Model
+	}
+	if input.Resolution != nil {
+		camera.Resolution = *input.Resolution
+	}
+	if input.Weight != nil {
+		camera.Weight = *input.Weight
+	}
+	if input.Zoom != nil {
+		camera.Zoom = *input.Zoom
+	}
 
 	v := validator.New()
 	if data.ValidateCamera(v, camera); !v.Valid() {
@@ -153,3 +169,7 @@ func (app *application) deleteCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+// BODY='{"Name":"Film Camera","Model":"Nikon FM2","Resolution":"35mm", "Weight":650.0"}'
+//curl -X PUT -d "$BODY" localhost:4000/v1/cameras/2
+// curl -X PATCH -d '{"weight: 750.0}' localhost:4000/v1/cameras/1
