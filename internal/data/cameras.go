@@ -163,10 +163,10 @@ func (c CameraModel) GetAll(name string, model string, filters Filters) ([]*Came
 		return nil, Metadata{}, err
 	}
 
-	rows, err := c.DB.QueryContext(ctx, query, name, model)
-	if err != nil {
-		return nil, Metadata{}, err
-	}
+	///	rows, err := c.DB.QueryContext(ctx, query, name, model)
+	///	if err != nil {
+	///		return nil, Metadata{}, err
+	///	}
 
 	defer rows.Close()
 

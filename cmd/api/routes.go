@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func (app *application) routes() *httprouter.Router {
+func (app *application) routes() http.Handler {
 	router := httprouter.New()
 
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
@@ -17,5 +17,6 @@ func (app *application) routes() *httprouter.Router {
 	router.Handler(http.MethodGet, "/v1/cameras/:id", http.HandlerFunc(app.showCameraHandler))
 	router.HandlerFunc(http.MethodPatch, "/v1/movies/:id", app.updateCameraHandler)
 	router.HandlerFunc(http.MethodDelete, "/v1/movies/:id", app.deleteCameraHandler)
-	return router
+
+	return app.recoverPanic(app.rateLimit(router))
 }
