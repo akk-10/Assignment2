@@ -78,6 +78,11 @@ func main() {
 		"env":  cfg.env,
 	})
 
+	err = app.serve()
+	if err != nil {
+		logger.PrintFatal(err, nil)
+	}
+	
 	err = srv.ListenAndServe()
 	logger.PrintFatal(err, nil)
 }
