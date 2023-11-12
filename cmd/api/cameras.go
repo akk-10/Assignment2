@@ -38,7 +38,7 @@ func (app *application) createCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.failedValidationResponse(w, r, v.Errors)
 		return
 	}
-	err = app.models.Camera.Insert(Camera)
+	err = app.models.Cameras.Insert(Camera)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
@@ -87,7 +87,7 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.notFoundResponse(w, r)
 		return
 	}
-	camera, err := app.models.Camera.Get(id)
+	camera, err := app.models.Cameras.Get(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -138,7 +138,7 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = app.models.Camera.Update(camera)
+	err = app.models.Cameras.Update(camera)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
@@ -159,7 +159,7 @@ func (app *application) deleteCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.notFoundResponse(w, r)
 		return
 	}
-	err = app.models.Camera.Delete(id)
+	err = app.models.Cameras.Delete(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
@@ -199,12 +199,12 @@ func (app *application) listCameraHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	cameras, metadata, err := app.models.Camera.GetAll(input.Name, input.Model, input.Filters)
+	camera, metadata, err := app.models.Cameras.GetAll(input.Name, input.Model, input.Filters)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 		return
 	}
-	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": cameras, "metadata": metadata}, nil)
+	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": camera, "metadata": metadata}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

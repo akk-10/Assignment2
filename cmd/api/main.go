@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	_ "github.com/lib/pq"
 	"mycameraapp/internal/data"
@@ -10,6 +11,7 @@ import (
 	"mycameraapp/internal/mailer"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +53,8 @@ type application struct {
 }
 
 func main() {
+	expvar.NewString("version").Set(version)
+
 	var cfg config
 	flag.IntVar(&cfg.port, "port", 4000, "API server port")
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
@@ -79,6 +83,16 @@ func main() {
 	}
 	defer db.Close()
 	logger.PrintInfo("database connection pool established", nil)
+
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		return db.Stats()
+	}))
+	expvar.Publish("timestamp", expvar.Func(func() interface{} {
+		return time.Now().Unix()
+	}))
 
 	app := &application{
 		config: cfg,

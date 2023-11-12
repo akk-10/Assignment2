@@ -11,7 +11,12 @@ var (
 )
 
 type Models struct {
-	Cameras     CameraModel
+	Cameras interface {
+		Insert(camera *Camera) error
+		Get(id int64) (*Camera, error)
+		Update(camera *Camera) error
+		Delete(id int64) error
+	}
 	Permissions PermissionModel
 	Tokens      TokenModel
 	Users       UserModel
