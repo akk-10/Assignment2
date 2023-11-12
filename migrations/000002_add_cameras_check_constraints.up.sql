@@ -15,3 +15,6 @@ ALTER TABLE cameras
 -- migrate -path=./migrations -database=$EXAMPLE_DSN down
 --go run ./cmd/api
 -- curl localhost:4000/v1/cameras/1
+--source $HOME/.profile
+--BODY='{"Name":"Film Camera","Model":"Nikon FM2","Resolution":"35mm", "Weight":650.0"}'
+--curl -X PUT -d "$BODY" localhost:4000/v1/cameras

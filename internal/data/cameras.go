@@ -128,8 +128,7 @@ func (c CameraModel) Delete(id int64) error {
 	if id < 1 {
 		return ErrRecordNotFound
 	}
-	query := `DELETE FROM cameras 
-       WHERE id = $1`
+	query := `DELETE FROM cameras WHERE id = $1`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
