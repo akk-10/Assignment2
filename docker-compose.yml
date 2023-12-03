@@ -1,38 +1,38 @@
-version: '3.9'
+version: '3'
+
 services:
-  app:
-    container_name: golang_container
-    environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-      - DATABASE_HOST=${DB_HOST}
-      - DATABASE_PORT=${DB_PORT}
-    tty: true
-    build: .
-    ports:
-      - '4000:4000'
-    restart: on-failure
-    volumes:
-      - .:/app
-    depends_on:
-      - postgresdb
-    networks:
-      - learning
-
-  postgresdb:
+  postgres:
     image: postgres:latest
-    container_name: postgres_container
+    container_name: mycameraapp-postgres
+    restart: unless-stopped
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
-      - DATABASE_HOST=${DB_HOST}
-    ports:
-      - '5432:5432'
-    networks:
-      - learning
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_DB=mycameraapp
 
-networks:
-  learning:
-    driver: bridge
+  redis:
+    image: redis:latest
+    container_name: mycameraapp-redis
+    restart: unless-stopped
+    volumes:
+      - ./data/redis:/data
+
+  mycameraapp:
+    build:
+      context: .
+    image: mycameraapp:latest
+    container_name: mycameraapp
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - ENV=development
+      - MYCAMERAAPP_DB_DSN=postgresql://postgres:mysecretpassword@postgres:5432/mycameraapp
+
+
+    depends_on:
+      - postgres
+      - redis
