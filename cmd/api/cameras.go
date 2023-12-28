@@ -6,7 +6,6 @@ import (
 	"mycameraapp/internal/data"
 	"mycameraapp/internal/validator"
 	"net/http"
-	"time"
 )
 
 func (app *application) createCameraHandler(w http.ResponseWriter, r *http.Request) {
@@ -64,22 +63,23 @@ func (app *application) showCameraHandler(w http.ResponseWriter, r *http.Request
 		app.notFoundResponse(w, r)
 		return
 	}
-
-	camera := data.Camera{
-		ID:         id,
-		CreatedAt:  time.Now(),
-		Name:       "Vintage Camera",
-		Model:      "Canon EOS 5D Mark IV",
-		Resolution: "4K",
-		Weight:     800.0,
-		Zoom:       5.0,
-		Version:    1,
+	cameras, err := app.models.Cameras.Get(id)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.notFoundResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
 	}
 
-	err = app.writeJSON(w, http.StatusOK, envelope{"Camera": camera}, nil)
+	// Encode the struct to JSON and send it as the HTTP response.
+	err = app.writeJSON(w, http.StatusOK, envelope{"cameras": cameras}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
+
 }
 func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := app.readIDParam(r)
@@ -110,11 +110,6 @@ func (app *application) updateCameraHandler(w http.ResponseWriter, r *http.Reque
 		app.badRequestResponse(w, r, err)
 		return
 	}
-	//camera.Name = input.Name
-	//camera.Model = input.Model
-	//camera.Resolution = input.Resolution
-	//camera.Weight = input.Weight
-	//camera.Zoom = input.Zoom
 
 	if input.Name != nil {
 		camera.Name = *input.Name
